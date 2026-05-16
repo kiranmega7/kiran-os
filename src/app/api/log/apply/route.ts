@@ -23,8 +23,12 @@ export async function POST(req: NextRequest) {
   for (const change of changes) {
     const table = change.table as Parameters<typeof supabase.from>[0];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const from = supabase.from(table as any);
+
     if (change.action === "update" && change.recordId) {
-      const query = supabase.from(table).update(change.fields).eq("id", change.recordId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const query = (from as any).update(change.fields).eq("id", change.recordId);
       if (USER_ID_TABLES.includes(change.table)) {
         const { error } = await query.eq("user_id", user.id);
         results.push({ success: !error, error: error?.message });
@@ -36,7 +40,8 @@ export async function POST(req: NextRequest) {
       const fields = USER_ID_TABLES.includes(change.table)
         ? { ...change.fields, user_id: user.id }
         : change.fields;
-      const { error } = await supabase.from(table).insert(fields);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (from as any).insert(fields);
       results.push({ success: !error, error: error?.message });
     }
   }
