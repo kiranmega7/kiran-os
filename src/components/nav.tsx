@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Target, Briefcase, Heart, ListTodo, TrendingUp, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { LogInput } from "@/components/log-input";
 
 const links = [
   { href: "/", label: "Today", icon: LayoutDashboard },
@@ -49,13 +50,16 @@ export function Nav() {
             </Link>
           ))}
         </nav>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
-        </button>
+        <div className="border-t pt-3 space-y-1">
+          <LogInput />
+          <button
+            onClick={signOut}
+            className="flex items-center gap-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
+        </div>
       </aside>
 
       {/* Mobile bottom nav */}
