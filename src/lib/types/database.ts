@@ -46,6 +46,7 @@ export interface Database {
           id: string; user_id: string; business_id: string | null; title: string;
           category: string; target_value: number | null; current_value: number;
           unit: string | null; deadline: string | null; status: string; notes: string | null;
+          daily_actions: string[] | null; context: string | null;
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["goals"]["Row"], "id" | "created_at">;

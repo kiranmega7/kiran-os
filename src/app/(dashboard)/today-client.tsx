@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Zap, Target, CheckCircle2, Circle, Sparkles, Dumbbell, TrendingUp, RefreshCw } from "lucide-react";
+import { Zap, Target, CheckCircle2, Circle, Sparkles, Dumbbell, TrendingUp, RefreshCw, Flame } from "lucide-react";
 import { formatCurrency, progressPercent, daysUntil } from "@/lib/utils";
 import { CheckinModal } from "@/components/checkin-modal";
 import type { Database } from "@/lib/types/database";
@@ -139,6 +139,32 @@ export function TodayClient({ userId, greeting, today, goals, tasks, checkin, bu
           </Button>
         </CardContent>
       </Card>
+
+      {/* Daily goal actions */}
+      {goals.some((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0) && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Flame className="w-4 h-4 text-orange-500" /> Daily non-negotiables
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {goals.filter((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0).map((g) => (
+              <div key={g.id}>
+                <p className="text-xs font-semibold text-gray-500 mb-1">{g.title}</p>
+                <ul className="space-y-1">
+                  {(g.daily_actions as string[]).map((action, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-orange-400 mt-0.5 shrink-0" />
+                      {action}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Financial goals */}
