@@ -274,48 +274,27 @@ export function GoalsClient({ userId, goals: initial }: Props) {
 
           {step === "confirm" && parsed && (
             <div className="space-y-4 py-1">
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Goal</span>
-                  <span className="font-semibold text-right max-w-[60%]">{parsed.title}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Category</span>
-                  <span className="font-semibold capitalize">{parsed.category}</span>
-                </div>
-                {parsed.target_value !== null && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Target</span>
-                    <span className="font-semibold">{parsed.target_value} {parsed.unit}</span>
-                  </div>
-                )}
-                {parsed.deadline && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Deadline</span>
-                    <span className="font-semibold">{new Date(parsed.deadline).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" })}</span>
-                  </div>
-                )}
+              <div>
+                <p className="font-semibold text-lg">{parsed.title}</p>
+                <p className="text-sm text-gray-400">
+                  {parsed.target_value !== null && `${parsed.target_value} ${parsed.unit} · `}
+                  {parsed.deadline && `${new Date(parsed.deadline).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" })}`}
+                </p>
               </div>
 
-              {parsed.reasoning && (
-                <p className="text-xs text-gray-500 italic">{parsed.reasoning}</p>
-              )}
-
               {parsed.daily_actions.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your daily non-negotiables</p>
-                  <ul className="space-y-2">
-                    {parsed.daily_actions.map((action, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                        {action}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Do every day</p>
+                  {parsed.daily_actions.slice(0, 3).map((action, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                      {action}
+                    </div>
+                  ))}
                 </div>
               )}
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep("input")}>Back</Button>
                 <Button className="flex-1" onClick={saveGoal} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
