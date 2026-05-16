@@ -6,11 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingUp, Target, Heart, Star, Sparkles, Loader2, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, TrendingUp, Target, Heart, Star, Sparkles, Loader2, CheckCircle2, ChevronDown, ChevronUp, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, progressPercent, daysUntil } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
@@ -31,25 +29,24 @@ interface Props {
   businesses: { id: string; name: string }[];
 }
 
-const CATEGORY_UNITS: Record<string, string> = {
-  financial: "$",
-  business: "customers",
-  fitness: "min/km",
-  personal: "",
+type ParsedGoal = {
+  title: string;
+  category: "financial" | "business" | "fitness" | "personal";
+  target_value: number | null;
+  current_value: number;
+  unit: string;
+  deadline: string | null;
+  daily_actions: string[];
+  reasoning: string;
 };
 
-const EMPTY_FORM = {
-  title: "", category: "financial", target_value: "", current_value: "", unit: "$", deadline: "",
-  current_situation: "", hours_per_day: "", main_lever: "",
-};
-
-export function GoalsClient({ userId, goals: initial, businesses }: Props) {
+export function GoalsClient({ userId, goals: initial }: Props) {
   const [goals, setGoals] = useState(initial);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"form" | "plan">("form");
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [generatingPlan, setGeneratingPlan] = useState(false);
-  const [plan, setPlan] = useState<{ daily_actions: string[]; reasoning: string } | null>(null);
+  const [input, setInput] = useState("");
+  const [step, setStep] = useState<"input" | "confirm">("input");
+  const [parsing, setParsing] = useState(false);
+  const [parsed, setParsed] = useState<ParsedGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -58,45 +55,44 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
   const supabase = createClient() as any;
 
   function openDialog() {
-    setForm(EMPTY_FORM);
-    setPlan(null);
-    setStep("form");
+    setInput("");
+    setParsed(null);
+    setStep("input");
     setOpen(true);
   }
 
-  async function generatePlan() {
-    if (!form.title || !form.target_value || !form.current_situation || !form.hours_per_day || !form.main_lever) return;
-    setGeneratingPlan(true);
+  async function parseGoal() {
+    if (!input.trim()) return;
+    setParsing(true);
     try {
-      const res = await fetch("/api/goals/breakdown", {
+      const res = await fetch("/api/goals/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ input }),
       });
       const data = await res.json();
-      setPlan(data);
-      setStep("plan");
+      setParsed(data);
+      setStep("confirm");
     } catch {
-      setPlan({ daily_actions: [], reasoning: "Failed to generate plan." });
-      setStep("plan");
+      setParsed(null);
     }
-    setGeneratingPlan(false);
+    setParsing(false);
   }
 
   async function saveGoal() {
+    if (!parsed) return;
     setSaving(true);
-    const context = `Situation: ${form.current_situation} | Hours/day: ${form.hours_per_day} | Lever: ${form.main_lever}`;
     const { data } = await supabase.from("goals").insert({
       user_id: userId,
-      title: form.title,
-      category: form.category,
-      target_value: parseFloat(form.target_value) || null,
-      current_value: parseFloat(form.current_value) || 0,
-      unit: form.unit || null,
-      deadline: form.deadline || null,
+      title: parsed.title,
+      category: parsed.category,
+      target_value: parsed.target_value,
+      current_value: parsed.current_value,
+      unit: parsed.unit || null,
+      deadline: parsed.deadline || null,
       status: "active",
-      context,
-      daily_actions: plan?.daily_actions ?? [],
+      daily_actions: parsed.daily_actions,
+      context: input,
     }).select().single();
     if (data) setGoals([...goals, data]);
     setSaving(false);
@@ -124,8 +120,8 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
     if (days <= 0) return "Deadline passed";
     const remaining = goal.target_value - goal.current_value;
     if (remaining <= 0) return "Goal achieved!";
-    if (goal.unit === "$") return `Save ${formatCurrency((remaining / days) * 30)}/month to hit target`;
-    return `${(remaining / days * 7).toFixed(1)} ${goal.unit}/week needed`;
+    if (goal.unit === "$") return `Need ${formatCurrency((remaining / days) * 30)}/month`;
+    return `Need ${(remaining / days * 7).toFixed(1)} ${goal.unit}/week`;
   }
 
   const grouped = {
@@ -134,8 +130,6 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
     fitness: goals.filter((g) => g.category === "fitness"),
     personal: goals.filter((g) => g.category === "personal"),
   };
-
-  const formValid = form.title && form.current_situation && form.hours_per_day && form.main_lever;
 
   return (
     <div className="space-y-6">
@@ -173,14 +167,16 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                         <Badge variant="outline" className="text-xs">{pct}%</Badge>
                       </div>
 
-                      <div className="flex items-center gap-2 mb-2">
-                        <Progress value={pct} className="flex-1 h-2" />
-                        <span className="text-sm text-gray-600 whitespace-nowrap">
-                          {goal.unit === "$" ? formatCurrency(goal.current_value) : goal.current_value}
-                          {" / "}
-                          {goal.unit === "$" ? formatCurrency(goal.target_value ?? 0) : `${goal.target_value} ${goal.unit ?? ""}`}
-                        </span>
-                      </div>
+                      {goal.target_value !== null && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <Progress value={pct} className="flex-1 h-2" />
+                          <span className="text-sm text-gray-600 whitespace-nowrap">
+                            {goal.unit === "$" ? formatCurrency(goal.current_value) : goal.current_value}
+                            {" / "}
+                            {goal.unit === "$" ? formatCurrency(goal.target_value ?? 0) : `${goal.target_value} ${goal.unit ?? ""}`}
+                          </span>
+                        </div>
+                      )}
 
                       {pace && <p className="text-xs text-gray-500 mb-2">{pace}</p>}
 
@@ -200,9 +196,11 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
-                          <button onClick={() => setUpdating(goal.id)} className="text-xs text-gray-400 hover:text-gray-700 underline">
-                            Update progress
-                          </button>
+                          {goal.target_value !== null && (
+                            <button onClick={() => setUpdating(goal.id)} className="text-xs text-gray-400 hover:text-gray-700 underline">
+                              Update progress
+                            </button>
+                          )}
                           <button
                             onClick={() => markAchieved(goal.id)}
                             disabled={achieving === goal.id}
@@ -227,7 +225,7 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                             <ul className="mt-2 space-y-1.5">
                               {actions.map((action, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                                  <Circle className="w-3 h-3 text-gray-300 mt-0.5 shrink-0" />
                                   {action}
                                 </li>
                               ))}
@@ -244,100 +242,70 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
         );
       })}
 
+      {goals.length === 0 && (
+        <p className="text-center text-gray-400 py-12">No goals yet. Add one above.</p>
+      )}
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{step === "form" ? "New goal" : "Your daily plan"}</DialogTitle>
+            <DialogTitle>{step === "input" ? "What's your goal?" : "Here's your plan"}</DialogTitle>
           </DialogHeader>
 
-          {step === "form" && (
-            <div className="space-y-3 py-1 max-h-[70vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Goal title</Label>
-                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. $10k/month income" className="mt-1" />
-                </div>
-                <div>
-                  <Label>Category</Label>
-                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v, unit: CATEGORY_UNITS[v] ?? "" })}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="financial">Financial</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
-                      <SelectItem value="fitness">Fitness</SelectItem>
-                      <SelectItem value="personal">Personal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label>Current</Label>
-                  <Input type="number" value={form.current_value} onChange={(e) => setForm({ ...form, current_value: e.target.value })} className="mt-1" placeholder="0" />
-                </div>
-                <div>
-                  <Label>Target</Label>
-                  <Input type="number" value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })} className="mt-1" placeholder="10000" />
-                </div>
-                <div>
-                  <Label>Unit</Label>
-                  <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="$" className="mt-1" />
-                </div>
-              </div>
-
-              <div>
-                <Label>Deadline</Label>
-                <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className="mt-1" />
-              </div>
-
-              <div className="border-t pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Context — be specific so the AI can help</p>
-                <div className="space-y-2">
-                  <div>
-                    <Label>Your current situation</Label>
-                    <Textarea
-                      value={form.current_situation}
-                      onChange={(e) => setForm({ ...form, current_situation: e.target.value })}
-                      placeholder="e.g. I earn $2k/month from a job, have DoubleLead at 0 MRR, and know how to code and sell"
-                      rows={2}
-                      className="mt-1 resize-none text-sm"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Hours/day available</Label>
-                      <Input value={form.hours_per_day} onChange={(e) => setForm({ ...form, hours_per_day: e.target.value })} placeholder="e.g. 3" className="mt-1" />
-                    </div>
-                    <div>
-                      <Label>Main lever</Label>
-                      <Input value={form.main_lever} onChange={(e) => setForm({ ...form, main_lever: e.target.value })} placeholder="e.g. sales, DoubleLead" className="mt-1" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Button className="w-full" onClick={generatePlan} disabled={!formValid || generatingPlan}>
-                {generatingPlan ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating plan...</>
-                ) : (
-                  <><Sparkles className="w-4 h-4 mr-2" /> Generate daily plan</>
-                )}
+          {step === "input" && (
+            <div className="space-y-4 py-1">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Describe your goal naturally — be specific. e.g. 'I want to hit $10k/month income by age 25. Currently earning $2k/month from my job. I have DoubleLead at 0 MRR and 3 hours a day to work on it.'"
+                rows={5}
+                className="resize-none text-sm"
+                autoFocus
+              />
+              <p className="text-xs text-gray-400">The more specific you are, the better the daily plan.</p>
+              <Button className="w-full" onClick={parseGoal} disabled={!input.trim() || parsing}>
+                {parsing
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Thinking...</>
+                  : <><Sparkles className="w-4 h-4 mr-2" /> Generate plan</>
+                }
               </Button>
             </div>
           )}
 
-          {step === "plan" && plan && (
+          {step === "confirm" && parsed && (
             <div className="space-y-4 py-1">
-              {plan.reasoning && (
-                <p className="text-sm text-gray-500 italic">{plan.reasoning}</p>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Goal</span>
+                  <span className="font-semibold text-right max-w-[60%]">{parsed.title}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Category</span>
+                  <span className="font-semibold capitalize">{parsed.category}</span>
+                </div>
+                {parsed.target_value !== null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Target</span>
+                    <span className="font-semibold">{parsed.target_value} {parsed.unit}</span>
+                  </div>
+                )}
+                {parsed.deadline && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Deadline</span>
+                    <span className="font-semibold">{new Date(parsed.deadline).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  </div>
+                )}
+              </div>
+
+              {parsed.reasoning && (
+                <p className="text-xs text-gray-500 italic">{parsed.reasoning}</p>
               )}
 
-              {plan.daily_actions.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Do these every day</p>
+              {parsed.daily_actions.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your daily non-negotiables</p>
                   <ul className="space-y-2">
-                    {plan.daily_actions.map((action, i) => (
+                    {parsed.daily_actions.map((action, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
                         <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
                         {action}
@@ -345,12 +313,10 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                     ))}
                   </ul>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-400">No plan generated. Try again with more context.</p>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setStep("form")}>Back</Button>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setStep("input")}>Back</Button>
                 <Button className="flex-1" onClick={saveGoal} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   Save goal
