@@ -31,6 +31,13 @@ interface Props {
   businesses: { id: string; name: string }[];
 }
 
+const CATEGORY_UNITS: Record<string, string> = {
+  financial: "$",
+  business: "customers",
+  fitness: "min/km",
+  personal: "",
+};
+
 const EMPTY_FORM = {
   title: "", category: "financial", target_value: "", current_value: "", unit: "$", deadline: "",
   current_situation: "", hours_per_day: "", main_lever: "",
@@ -128,7 +135,7 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
     personal: goals.filter((g) => g.category === "personal"),
   };
 
-  const formValid = form.title && form.target_value && form.current_situation && form.hours_per_day && form.main_lever;
+  const formValid = form.title && form.current_situation && form.hours_per_day && form.main_lever;
 
   return (
     <div className="space-y-6">
@@ -252,7 +259,7 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                 </div>
                 <div>
                   <Label>Category</Label>
-                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v, unit: CATEGORY_UNITS[v] ?? "" })}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="financial">Financial</SelectItem>
