@@ -68,7 +68,8 @@ Rules:
   const text = message.content[0].type === "text" ? message.content[0].text : "{}";
 
   try {
-    const parsed = JSON.parse(text);
+    const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(clean);
     return NextResponse.json(parsed);
   } catch {
     return NextResponse.json({ changes: [], summary: "Could not parse AI response." });
