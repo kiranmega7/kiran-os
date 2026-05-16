@@ -227,7 +227,7 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
           </DialogHeader>
 
           {step === "form" && (
-            <div className="space-y-3 py-1">
+            <div className="space-y-3 py-1 max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label>Goal title</Label>
