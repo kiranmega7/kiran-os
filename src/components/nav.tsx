@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Target, Briefcase, Heart, ListTodo, TrendingUp, LogOut } from "lucide-react";
+import { LayoutDashboard, Target, Briefcase, Heart, ListTodo, TrendingUp, LogOut, Plug } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { LogInput } from "@/components/log-input";
 
@@ -14,6 +14,7 @@ const links = [
   { href: "/finance", label: "Finance", icon: TrendingUp },
   { href: "/health", label: "Health", icon: Heart },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/integrations", label: "Integrations", icon: Plug },
 ];
 
 export function Nav() {
