@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, ArrowUpCircle, ArrowDownCircle, Calendar } from "lucide-react";
+import { Plus, ArrowUpCircle, ArrowDownCircle, Calendar, Minus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, progressPercent, daysUntil, formatDate } from "@/lib/utils";
 import type { Database } from "@/lib/types/database";
@@ -30,6 +30,9 @@ export function FinanceClient({ userId, incomeSources: initIncome, logs: initLog
   const [logs, setLogs] = useState(initLogs);
   const [logOpen, setLogOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  const [quickAmount, setQuickAmount] = useState("");
+  const [quickType, setQuickType] = useState<"income" | "expense" | "savings">("income");
+  const [quickLogging, setQuickLogging] = useState(false);
   const [logForm, setLogForm] = useState({ amount: "", type: "savings", category: "", notes: "", date: new Date().toISOString().split("T")[0] });
   const [incomeForm, setIncomeForm] = useState({ name: "", type: "salary", amount: "", expected_date: "", notes: "" });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,6 +41,22 @@ export function FinanceClient({ userId, incomeSources: initIncome, logs: initLog
   const totalSaved = logs.filter((l) => l.type === "savings").reduce((sum, l) => sum + l.amount, 0);
   const totalIncome = logs.filter((l) => l.type === "income").reduce((sum, l) => sum + l.amount, 0);
   const totalExpenses = logs.filter((l) => l.type === "expense").reduce((sum, l) => sum + Math.abs(l.amount), 0);
+
+  async function quickLog() {
+    const amount = parseFloat(quickAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    setQuickLogging(true);
+    const { data } = await supabase.from("savings_logs").insert({
+      user_id: userId,
+      date: new Date().toISOString().split("T")[0],
+      amount: quickType === "expense" ? -amount : amount,
+      type: quickType,
+      notes: null,
+    }).select().single();
+    if (data) setLogs([data, ...logs]);
+    setQuickAmount("");
+    setQuickLogging(false);
+  }
 
   async function addLog() {
     const { data } = await supabase.from("savings_logs").insert({
@@ -84,6 +103,35 @@ export function FinanceClient({ userId, incomeSources: initIncome, logs: initLog
             <Plus className="w-4 h-4 mr-1" /> Log entry
           </Button>
         </div>
+      </div>
+
+      {/* Quick log bar */}
+      <div className="flex gap-2 items-center bg-gray-50 border rounded-xl px-3 py-2">
+        <div className="flex rounded-lg overflow-hidden border text-xs font-medium">
+          {(["income", "savings", "expense"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setQuickType(t)}
+              className={`px-3 py-1.5 transition-colors ${quickType === t
+                ? t === "expense" ? "bg-red-500 text-white" : "bg-green-500 text-white"
+                : "bg-white text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              {t === "income" ? "+" : t === "expense" ? "-" : "💰"} {t}
+            </button>
+          ))}
+        </div>
+        <Input
+          type="number"
+          placeholder="Amount (SGD)"
+          value={quickAmount}
+          onChange={(e) => setQuickAmount(e.target.value)}
+          className="flex-1 h-8 text-sm"
+          onKeyDown={(e) => { if (e.key === "Enter") quickLog(); }}
+        />
+        <Button size="sm" onClick={quickLog} disabled={!quickAmount || quickLogging} className="h-8 shrink-0">
+          Log
+        </Button>
       </div>
 
       {/* Summary cards */}

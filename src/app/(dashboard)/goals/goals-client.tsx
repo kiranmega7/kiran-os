@@ -46,6 +46,7 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [achieving, setAchieving] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient() as any;
 
@@ -93,6 +94,13 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
     if (data) setGoals([...goals, data]);
     setSaving(false);
     setOpen(false);
+  }
+
+  async function markAchieved(goalId: string) {
+    setAchieving(goalId);
+    await supabase.from("goals").update({ status: "achieved" }).eq("id", goalId);
+    setGoals(goals.filter((g) => g.id !== goalId));
+    setAchieving(null);
   }
 
   async function updateProgress(goal: Goal, newValue: string) {
@@ -184,9 +192,18 @@ export function GoalsClient({ userId, goals: initial, businesses }: Props) {
                           <Button size="sm" variant="outline" onClick={() => setUpdating(null)}>Cancel</Button>
                         </div>
                       ) : (
-                        <button onClick={() => setUpdating(goal.id)} className="text-xs text-gray-400 hover:text-gray-700 underline">
-                          Update progress
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => setUpdating(goal.id)} className="text-xs text-gray-400 hover:text-gray-700 underline">
+                            Update progress
+                          </button>
+                          <button
+                            onClick={() => markAchieved(goal.id)}
+                            disabled={achieving === goal.id}
+                            className="text-xs text-green-600 hover:text-green-800 underline font-medium"
+                          >
+                            {achieving === goal.id ? "Saving..." : "Mark achieved ✓"}
+                          </button>
+                        </div>
                       )}
 
                       {actions.length > 0 && (

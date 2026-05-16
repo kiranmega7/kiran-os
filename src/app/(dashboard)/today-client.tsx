@@ -140,30 +140,9 @@ export function TodayClient({ userId, greeting, today, goals, tasks, checkin, bu
         </CardContent>
       </Card>
 
-      {/* Daily goal actions */}
+      {/* Daily goal actions — checkable */}
       {goals.some((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0) && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-500" /> Daily non-negotiables
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {goals.filter((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0).map((g) => (
-              <div key={g.id}>
-                <p className="text-xs font-semibold text-gray-500 mb-1">{g.title}</p>
-                <ul className="space-y-1">
-                  {(g.daily_actions as string[]).map((action, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-orange-400 mt-0.5 shrink-0" />
-                      {action}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <DailyNonNegotiables goals={goals} />
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -295,5 +274,71 @@ export function TodayClient({ userId, greeting, today, goals, tasks, checkin, bu
 
       <CheckinModal open={checkinOpen} onClose={() => setCheckinOpen(false)} userId={userId} />
     </div>
+  );
+}
+
+function DailyNonNegotiables({ goals }: { goals: Goal[] }) {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const storageKey = `kiran-os-checked-${todayStr}`;
+
+  const [checked, setChecked] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  function toggle(key: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      localStorage.setItem(storageKey, JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  const goalsWithActions = goals.filter((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0);
+  const totalActions = goalsWithActions.reduce((sum, g) => sum + (g.daily_actions as string[]).length, 0);
+  const doneCount = [...checked].length;
+
+  return (
+    <Card className="border-orange-200 bg-orange-50">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-500" /> Daily non-negotiables
+          </CardTitle>
+          <span className="text-xs font-semibold text-orange-600">{doneCount}/{totalActions} done</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {goalsWithActions.map((g) => (
+          <div key={g.id}>
+            <p className="text-xs font-semibold text-gray-500 mb-2">{g.title}</p>
+            <ul className="space-y-2">
+              {(g.daily_actions as string[]).map((action, i) => {
+                const key = `${g.id}-${i}`;
+                const done = checked.has(key);
+                return (
+                  <li key={key}>
+                    <button
+                      onClick={() => toggle(key)}
+                      className={`flex items-start gap-2 text-sm w-full text-left transition-opacity ${done ? "opacity-50" : ""}`}
+                    >
+                      {done
+                        ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                        : <Circle className="w-4 h-4 text-orange-300 mt-0.5 shrink-0" />
+                      }
+                      <span className={done ? "line-through text-gray-400" : ""}>{action}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

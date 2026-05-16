@@ -31,6 +31,8 @@ export function BusinessesClient({ userId, businesses: init, metrics: initMetric
   const [open, setOpen] = useState(false);
   const [metricOpen, setMetricOpen] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(init[0]?.id ?? null);
+  const [editingMrr, setEditingMrr] = useState<string | null>(null);
+  const [mrrValue, setMrrValue] = useState("");
   const [form, setForm] = useState({ name: "", type: "saas", status: "active", description: "", monthly_revenue_target: "", current_mrr: "" });
   const [metricForm, setMetricForm] = useState({ metric_name: "", value: "", notes: "", date: new Date().toISOString().split("T")[0] });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,6 +50,15 @@ export function BusinessesClient({ userId, businesses: init, metrics: initMetric
     }).select().single();
     if (data) setBusinesses([...businesses, data]);
     setOpen(false);
+  }
+
+  async function updateMrr(businessId: string) {
+    const val = parseFloat(mrrValue);
+    if (isNaN(val)) return;
+    await supabase.from("businesses").update({ current_mrr: val }).eq("id", businessId);
+    setBusinesses(businesses.map((b) => b.id === businessId ? { ...b, current_mrr: val } : b));
+    setEditingMrr(null);
+    setMrrValue("");
   }
 
   async function logMetric(businessId: string) {
@@ -95,8 +106,31 @@ export function BusinessesClient({ userId, businesses: init, metrics: initMetric
               <CardContent>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-500">Current MRR</p>
-                    <p className="text-lg font-bold">{formatCurrency(b.current_mrr)}</p>
+                    <p className="text-xs text-gray-500 mb-1">Current MRR</p>
+                    {editingMrr === b.id ? (
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          value={mrrValue}
+                          onChange={(e) => setMrrValue(e.target.value)}
+                          className="h-7 text-sm w-24"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") updateMrr(b.id);
+                            if (e.key === "Escape") setEditingMrr(null);
+                          }}
+                        />
+                        <Button size="sm" className="h-7 text-xs px-2" onClick={() => updateMrr(b.id)}>✓</Button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditingMrr(b.id); setMrrValue(String(b.current_mrr)); }}
+                        className="text-lg font-bold hover:text-blue-600 transition-colors"
+                        title="Click to update MRR"
+                      >
+                        {formatCurrency(b.current_mrr)}
+                      </button>
+                    )}
                   </div>
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500">Target MRR</p>
