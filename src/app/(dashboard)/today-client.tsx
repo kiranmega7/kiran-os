@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Zap, Target, CheckCircle2, Circle, Sparkles, Dumbbell, TrendingUp, RefreshCw, Flame } from "lucide-react";
 import { formatCurrency, progressPercent, daysUntil } from "@/lib/utils";
 import { CheckinModal } from "@/components/checkin-modal";
+import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/types/database";
 
 type Goal = Database["public"]["Tables"]["goals"]["Row"];
@@ -289,6 +290,14 @@ function DailyNonNegotiables({ goals }: { goals: Goal[] }) {
     } catch { return new Set(); }
   });
 
+  const [goalActions, setGoalActions] = useState<Record<string, string[]>>(
+    Object.fromEntries(goals.map((g) => [g.id, Array.isArray(g.daily_actions) ? g.daily_actions as string[] : []]))
+  );
+  const [editing, setEditing] = useState<{ goalId: string; index: number } | null>(null);
+  const [editText, setEditText] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (createClient as any)();
+
   function toggle(key: string) {
     setChecked((prev) => {
       const next = new Set(prev);
@@ -298,8 +307,22 @@ function DailyNonNegotiables({ goals }: { goals: Goal[] }) {
     });
   }
 
-  const goalsWithActions = goals.filter((g) => Array.isArray(g.daily_actions) && (g.daily_actions as string[]).length > 0);
-  const totalActions = goalsWithActions.reduce((sum, g) => sum + (g.daily_actions as string[]).length, 0);
+  async function saveEdit(goalId: string, index: number) {
+    const actions = [...goalActions[goalId]];
+    actions[index] = editText.trim();
+    setGoalActions({ ...goalActions, [goalId]: actions });
+    await supabase.from("goals").update({ daily_actions: actions }).eq("id", goalId);
+    setEditing(null);
+  }
+
+  async function deleteAction(goalId: string, index: number) {
+    const actions = goalActions[goalId].filter((_, i) => i !== index);
+    setGoalActions({ ...goalActions, [goalId]: actions });
+    await supabase.from("goals").update({ daily_actions: actions }).eq("id", goalId);
+  }
+
+  const goalsWithActions = goals.filter((g) => (goalActions[g.id] ?? []).length > 0);
+  const totalActions = goalsWithActions.reduce((sum, g) => sum + (goalActions[g.id] ?? []).length, 0);
   const doneCount = [...checked].length;
 
   return (
@@ -317,20 +340,42 @@ function DailyNonNegotiables({ goals }: { goals: Goal[] }) {
           <div key={g.id}>
             <p className="text-xs font-semibold text-gray-500 mb-2">{g.title}</p>
             <ul className="space-y-2">
-              {(g.daily_actions as string[]).map((action, i) => {
+              {(goalActions[g.id] ?? []).map((action, i) => {
                 const key = `${g.id}-${i}`;
                 const done = checked.has(key);
+                const isEditing = editing?.goalId === g.id && editing?.index === i;
                 return (
-                  <li key={key}>
-                    <button
-                      onClick={() => toggle(key)}
-                      className={`flex items-start gap-2 text-sm w-full text-left transition-opacity ${done ? "opacity-50" : ""}`}
-                    >
+                  <li key={key} className="flex items-start gap-2 group">
+                    <button onClick={() => toggle(key)} className="mt-0.5 shrink-0">
                       {done
-                        ? <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                        : <Circle className="w-4 h-4 text-orange-300 mt-0.5 shrink-0" />
+                        ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        : <Circle className="w-4 h-4 text-orange-300" />
                       }
-                      <span className={done ? "line-through text-gray-400" : ""}>{action}</span>
+                    </button>
+                    {isEditing ? (
+                      <input
+                        className="flex-1 text-sm border border-orange-300 rounded px-2 py-0.5 bg-white focus:outline-none"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(g.id, i);
+                          if (e.key === "Escape") setEditing(null);
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className={`flex-1 text-sm cursor-pointer ${done ? "line-through text-gray-400" : ""}`}
+                        onClick={() => { setEditing({ goalId: g.id, index: i }); setEditText(action); }}
+                      >
+                        {action}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => deleteAction(g.id, i)}
+                      className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5 text-xs"
+                    >
+                      ✕
                     </button>
                   </li>
                 );

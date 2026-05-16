@@ -28,7 +28,7 @@ Extract:
 - current_value: numeric current value (default 0)
 - unit: unit of measurement ("$", "min/km", "kg", "customers", etc.) or ""
 - deadline: ISO date string (YYYY-MM-DD) or null
-- daily_actions: exactly 3 daily non-negotiable actions, max 10 words each, no fluff
+- daily_actions: exactly 3 daily actions, max 8 words each, action verbs only, no explanations
 - reasoning: one sentence explaining the daily plan logic
 
 Rules:
